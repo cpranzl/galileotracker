@@ -20,4 +20,4 @@ No parameters age given, altitude and azimuth are calculated for an observer in 
 Coordinates as well as elevation and a time is provided. Altitude and elevation are calculated for the given moment in time.
 
 ## EXIT STATUS
-    TODO: List exit codes
+TODO: List exit codes
