@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 __author__ = "Christoph Pranzl"
 __copyright__ = "Copyright 2016, Christoph Pranzl"
@@ -33,97 +33,125 @@ EXAMPLES
 
     galileotracker
 
-    No parameters age given, altitude and azimuth are calculated for an observer in
-    Traun right now
+    No parameters age given, altitude and azimuth are calculated for an
+    observer in Traun right now
 
-    galileotracker --coordinates=14.221162,48.223560 --elevation=273 --time=2016-06-23T10:00:00
+    galileotracker --coordinates=14.221162,48.223560 --elevation=273
+                   --time=2016-06-23T10:00:00
 
-    Coordinates as well as elevation and a time is provided. Altitude and elevation
-    are calculated for the given moment in time.
-
-
-EXIT STATUS
-
-    TODO: List exit codes
+    Coordinates as well as elevation and a time is provided. Altitude and
+    elevation are calculated for the given moment in time.
 
 """
 
-import sys, os, traceback, optparse
+import sys, os, traceback, argparse
 import re
 import math
 import time
 from datetime import datetime
 import ephem
-import urllib2
+from urllib.request import urlopen
 import dateutil.parser
+
 
 def main():
 
-    global options, args
+    global args
 
-    if options.verbose: print("Coordinates: " + options.coordinates)
-    if options.verbose: print("Elevation (m): " + str(options.elevation))
-    if options.verbose: print("Time: " + str(options.time))
+    if args.verbose: print("Coordinates: " + args.coordinates)
+    if args.verbose: print("Elevation (m): " + str(args.elevation))
+    if args.verbose: print("Time: " + str(args.time))
 
-    coordinates = options.coordinates.split(",")
+    coordinates = args.coordinates.split(",")
     degrees_per_radian = 180.0 / math.pi
 
     home = ephem.Observer()
     home.lon = coordinates[0]
     home.lat = coordinates[1]
-    home.elevation = options.elevation
-    home.date = dateutil.parser.parse(options.time)
+    home.elevation = args.elevation
+    home.date = dateutil.parser.parse(args.time)
 
     tle = []
-    response = urllib2.urlopen(options.url)
-    text = response.read()
-    list = text.split('\n')
-    del list[-1]
-    for line in list:
-        start = line[0]
-        if start == '2':
-        tle.append(line.strip(' \t\n\r'))
-        gsat = ephem.readtle(tle[0],tle[1],tle[2])
-        gsat.compute(home)
-        info = home.next_pass(gsat)
-        rise_time = dateutil.parser.parse(str(info[0]))
-        set_time = dateutil.parser.parse(str(info[4]))
-        if options.apparent:
-            if gsat.alt > 0:
-            print(str(tle[0]) + ', altitude % 4.1f deg, azimuth % 5.1f deg' % (gsat.alt * degrees_per_radian, gsat.$
-                if options.verbose: print('Rise time: ' + str(rise_time))
-                if options.verbose: print(' Set time: ' + str(set_time))
+    prefix = '2'
+
+    with urlopen(args.url) as response:
+        for line in response:
+            line = line.decode('utf-8')
+            start = line[0]
+            if start == prefix:
+                tle.append(line.strip('\r\n'))
+                gsat = ephem.readtle(tle[0],tle[1],tle[2])
+                gsat.compute(home)
+                info = home.next_pass(gsat)
+                rise_time = dateutil.parser.parse(str(info[0]))
+                set_time = dateutil.parser.parse(str(info[4]))
+                if args.apparent:
+                    if gsat.alt > 0:
+                        print("{0}, altitude {1:4.1f} deg, azimuth {2:5.1f} deg"\
+                              .format(str(tle[0]), \
+                                      gsat.alt * degrees_per_radian, \
+                                      gsat.az * degrees_per_radian))
+                        if args.verbose: print("Rise time: " + str(rise_time))
+                        if args.verbose: print(" Set time: " + str(set_time))
+                else:
+                    print("{0}, altitude {1:4.1f} deg, azimuth {2:5.1f} deg"\
+                              .format(str(tle[0]), \
+                                      gsat.alt * degrees_per_radian, \
+                                      gsat.az * degrees_per_radian))
+                    if args.verbose: print("Rise time: " + str(rise_time))
+                    if args.verbose: print(" Set time: " + str(set_time))
+                tle = []
             else:
-            print(str(tle[0]) + ', altitude %4.1f deg, azimuth %5.1f deg' % (gsat.alt * degrees_per_radian, gsat.az$
-            if options.verbose: print('Rise time: ' + str(rise_time))
-            if options.verbose: print(' Set time: ' + str(set_time))
-        tle = []
-        else:
-        tle.append(line.strip(' \t\n\r'))
+                tle.append(line.strip(' \r\n'))
 
 if __name__ == '__main__':
     try:
         start_time = time.time()
-        parser = optparse.OptionParser(formatter=optparse.TitledHelpFormatter(), usage=globals()['__doc__'], versio$
-        parser.add_option ('-v', '--verbose', action='store_true', default=False, help='verbose output')
-        parser.add_option ('-c', '--coordinates', dest='coordinates', default='14.221162,48.223560', type='string',$
-    parser.add_option ('-e', '--elevation', dest='elevation', default='273', type='int', help='Elevation of the obs$
-        parser.add_option ('-t', '--time', dest='time', default=str(datetime.utcnow().isoformat()), type='string', $
-    parser.add_option ('-a', '--apparent', action='store_true', default=False, help='Show only apparent satellites')
-    parser.add_option ('-u', '--url', dest='url', default='https://www.celestrak.com/NORAD/elements/galileo.txt', t$
-    (options, args) = parser.parse_args()
-        if options.verbose: print(datetime.utcnow().isoformat())
+        parser =  argparse.ArgumentParser()
+        parser.add_argument("-v", \
+                            "--verbose", \
+                            action="store_true", \
+                            default=False, \
+                            help="increase verbose output")
+        parser.add_argument("-c", \
+                            "--coordinates", \
+                            default="14.221162,48.223560", \
+                            help="Location of the observer")
+        parser.add_argument("-e", \
+                            "--elevation", \
+                            dest="elevation", \
+                            default=273, \
+                            type=int, \
+                            help="Elevation of the observer")
+        parser.add_argument("-t", \
+                            "--time", \
+                            dest="time", \
+                            default=str(datetime.utcnow().isoformat()), \
+                            help="Point of time for calculation")
+        parser.add_argument("-a", \
+                            "--apparent", \
+                            action="store_true", \
+                            default=False, \
+                            help="Show only apparent satellites")
+        parser.add_argument("-u", \
+                            "--url", \
+                            dest="url", \
+                            default="https://www.celestrak.com/NORAD/elements/galileo.txt", \
+                            help="3")
+        args = parser.parse_args()
+        if args.verbose: print(datetime.utcnow().isoformat())
         main()
-        if options.verbose: print(datetime.utcnow().isoformat())
-        if options.verbose: print 'TOTAL CALCULATION TIME IN MINUTES:',
-        if options.verbose: print (time.time() - start_time) / 60.0
+        if args.verbose: print(datetime.utcnow().isoformat())
+        if args.verbose: print("TOTAL CALCULATION TIME IN MINUTES:")
+        if args.verbose: print((time.time() - start_time) / 60.0)
         sys.exit(0)
-    except KeyboardInterrupt, e: # Ctrl-C
+    except KeyboardInterrupt as e:
         raise e
-    except SystemExit, e: # sys.exit()
+    except SystemExit as e:
         raise e
-    except Exception, e:
-        print 'ERROR, UNEXPECTED EXCEPTION'
-        print str(e)
+    except Exception as e:
+        print('ERROR, UNEXPECTED EXCEPTION')
+        print(str(e))
         traceback.print_exc()
         os._exit(1)
+
